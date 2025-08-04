@@ -5,7 +5,7 @@ import joblib
 import matplotlib.pyplot as plt
 
 # Load saved models
-model = joblib.load('rf_model.pkl')
+model = joblib.load('heart_model.pkl')
 scaler = joblib.load('scaler.pkl')
 onehot_encoder = joblib.load('onehot_encoder.pkl')
 ordinal_encoder = joblib.load('ordinal_encoder.pkl')
