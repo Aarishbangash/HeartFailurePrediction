@@ -5,7 +5,7 @@ import numpy as np
 
 # Load model
 try:
-    with open("model.pkl", "rb") as f:
+    with open("heart_model.pkl", "rb") as f:
         model = pickle.load(f)
 except Exception as e:
     st.error(f"❌ Failed to load model: {e}")
