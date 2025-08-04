@@ -10,7 +10,7 @@ try:
     with open("scaler.pkl", "rb") as f:
         scaler = pickle.load(f)
 
-    with open("encoder.pkl", "rb") as f:
+    with open("ordinal_encoder.pkl", "rb") as f:
         encoder = pickle.load(f)
 
     with open("feature_columns.pkl", "rb") as f:
