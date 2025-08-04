@@ -8,7 +8,7 @@ import seaborn as sns
 # Set wide layout and page config
 st.set_page_config(page_title="Heart Disease Prediction", layout="wide")
 
-# Title and description with custom styling using markdown and HTML inside streamlit
+# Custom CSS for styling result text prominently
 st.markdown(
     """
     <style>
@@ -34,6 +34,30 @@ st.markdown(
         margin-bottom: 20px;
         border-bottom: 3px solid #198754;
         padding-bottom: 5px;
+    }
+    .prediction-success {
+        color: #198754;  /* bootstrap success green */
+        font-weight: 900;
+        font-size: 48px;
+        text-align: center;
+        background-color: #d1e7dd;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 0 auto 30px auto;
+        max-width: 500px;
+        box-shadow: 0 0 15px #19875466;
+    }
+    .prediction-fail {
+        color: #dc3545;  /* bootstrap danger red */
+        font-weight: 900;
+        font-size: 48px;
+        text-align: center;
+        background-color: #f8d7da;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 0 auto 30px auto;
+        max-width: 500px;
+        box-shadow: 0 0 15px #dc354566;
     }
     .metric-label {
         font-weight: 600;
@@ -67,7 +91,7 @@ def load_artifacts():
 
 model, ord_encoder, onehot_encoder, scaler, feature_cols = load_artifacts()
 
-# Sidebar for user input with nice grouping & tooltip help text
+# Sidebar form for user input
 st.sidebar.header("Patient Info - Enter to Predict")
 def user_input_features():
     Age = st.sidebar.slider("Age (years)", 29, 77, 54, help="Age of the patient")
@@ -96,11 +120,8 @@ def user_input_features():
     }
 
 input_data = user_input_features()
-
-# Create DataFrame for input
 input_df = pd.DataFrame([input_data])
 
-# Preprocessing for prediction: follow steps from notebook
 def preprocess_input(df_in):
     df = df_in.copy()
     numerical = ['Age', 'RestingBP', 'Cholesterol', 'MaxHR', 'Oldpeak']
@@ -132,59 +153,21 @@ def preprocess_input(df_in):
     return processed_df
 
 X_input = preprocess_input(input_df)
-
-# Predict heart disease
 prediction = model.predict(X_input)[0]
+# We get probabilities if needed, but not used in UI now
+# prediction_proba = model.predict_proba(X_input)[0, 1]
 
-# Map prediction to text
-result = "Disease Detected ❤️‍🩹" if prediction == 1 else "No Disease Detected 💓"
+# Display prediction with enhanced styling
+if prediction == 1:
+    st.markdown(f'<div class="prediction-fail">Disease Detected ❤️‍🩹</div>', unsafe_allow_html=True)
+else:
+    st.markdown(f'<div class="prediction-success">No Disease Detected 💓</div>', unsafe_allow_html=True)
 
-# Show prediction result dynamically
-st.markdown("<h2 class='section-header'>Prediction Result</h2>", unsafe_allow_html=True)
-st.markdown(f"<h3 style='text-align:center;'>**{result}**</h3>", unsafe_allow_html=True)
-
-# Show model performance metrics (make sure to align these with classification report)
-# Replace these with actual metrics computed on test data for consistency
-
-# Here, use classification report to extract exact metrics:
-classification_rep_text = """
-              precision    recall  f1-score   support
-
-           0       0.86      0.88      0.87        41
-           1       0.88      0.86      0.87        42
-
-    accuracy                           0.87        83
-   macro avg       0.87      0.87      0.87        83
-weighted avg       0.87      0.87      0.87        83
-"""
-
-# Parse metrics from the classification report string for exact display
-def parse_metrics_from_report(report_str):
-    lines = report_str.strip().split('\n')
-    acc = 0
-    precision = 0
-    recall = 0
-    f1 = 0
-    weighted_line = None
-    for line in lines:
-        if 'accuracy' in line.lower():
-            parts = line.strip().split()
-            try:
-                acc = float(parts[-2])
-            except:
-                acc = 0
-        if 'weighted avg' in line.lower():
-            weighted_line = line.strip().split()
-    if weighted_line and len(weighted_line) >= 4:
-        try:
-            precision = float(weighted_line[1])
-            recall = float(weighted_line[2])
-            f1 = float(weighted_line[3])
-        except:
-            precision = recall = f1 = 0
-    return acc, precision, recall, f1
-
-accuracy, precision, recall, f1 = parse_metrics_from_report(classification_rep_text)
+# Using your real evaluation metrics from your model (replace here with your actual values)
+accuracy = 0.8641304347826086
+precision = 0.89
+recall = 0.88
+f1 = 0.8826291079812206
 
 st.markdown("<h2 class='section-header'>Model Performance Metrics (Random Forest)</h2>", unsafe_allow_html=True)
 col1, col2, col3, col4 = st.columns(4)
@@ -193,7 +176,7 @@ col2.metric("Precision", f"{precision:.2f}")
 col3.metric("Recall", f"{recall:.2f}")
 col4.metric("F1 Score", f"{f1:.2f}")
 
-st.text_area("Classification Report", classification_rep_text, height=140)
+# Remove classification report as per request
 
 # Feature importance display
 importances = model.feature_importances_
@@ -209,7 +192,8 @@ top_features = feature_importance_df.head(10)
 fig, ax = plt.subplots(figsize=(8,5))
 sns.barplot(x='Importance', y='Feature', data=top_features, ax=ax, palette='viridis')
 ax.set_title("Feature Importance from Random Forest")
+ax.grid(axis="x", linestyle="--", alpha=0.6)
 st.pyplot(fig)
 
-# Show footer
+# Footer
 st.markdown('<div class="footer">Developed with ❤️ by YourName &nbsp;&nbsp;|&nbsp;&nbsp; Dataset & Model Adapted</div>', unsafe_allow_html=True)
