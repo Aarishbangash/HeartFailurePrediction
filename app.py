@@ -4,7 +4,7 @@ import pickle
 
 # Load model and encoders
 try:
-    with open("model.pkl", "rb") as f:
+    with open("heart_model.pkl", "rb") as f:
         model = pickle.load(f)
 
     with open("scaler.pkl", "rb") as f:
