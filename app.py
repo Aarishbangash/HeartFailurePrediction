@@ -3,25 +3,25 @@ import pickle
 import pandas as pd
 import numpy as np
 
-# Load model
+# Load model & preprocessors
 try:
     with open("heart_model.pkl", "rb") as f:
         model = pickle.load(f)
+    with open("scaler.pkl", "rb") as f:
+        scaler = pickle.load(f)
+    with open("onehot_encoder.pkl", "rb") as f:
+        onehot_encoder = pickle.load(f)
+    with open("ordinal_encoder.pkl", "rb") as f:
+        ordinal_encoder = pickle.load(f)
+    with open("feature_columns.pkl", "rb") as f:
+        feature_columns = pickle.load(f)
 except Exception as e:
-    st.error(f"❌ Failed to load model: {e}")
+    st.error(f"❌ Failed to load model or preprocessors: {e}")
     st.stop()
-
-# Expected features
-expected_cols = [
-    'Age', 'RestingBP', 'Cholesterol', 'MaxHR', 'Oldpeak',
-    'Gender_M', 'ChestPainType_ATA', 'ChestPainType_NAP', 'ChestPainType_TA',
-    'FastingBS_Yes', 'RestingECG_Normal', 'RestingECG_ST',
-    'ExerciseAngina_Y', 'ST_Slope'
-]
 
 st.title("❤️ Heart Disease Prediction App")
 
-# Input form
+# Form input
 with st.form("user_inputs"):
     age = st.number_input("Age", 20, 100, 50)
     resting_bp = st.number_input("Resting Blood Pressure", 50, 200, 120)
@@ -40,45 +40,45 @@ with st.form("user_inputs"):
 
 if submitted:
     try:
-        # Base numeric features
-        input_data = {
-            "Age": age,
-            "RestingBP": resting_bp,
-            "Cholesterol": cholesterol,
-            "MaxHR": max_hr,
-            "Oldpeak": oldpeak,
-            "ST_Slope": st_slope
-        }
+        # Create DataFrame
+        df = pd.DataFrame({
+            "Age": [age],
+            "RestingBP": [resting_bp],
+            "Cholesterol": [cholesterol],
+            "MaxHR": [max_hr],
+            "Oldpeak": [oldpeak],
+            "Gender": [gender],
+            "ChestPainType": [cp_type],
+            "FastingBS": [1 if fasting_bs == "Yes" else 0],
+            "RestingECG": [rest_ecg],
+            "ExerciseAngina": ["Y" if exercise_angina == "Yes" else "N"],
+            "ST_Slope": [st_slope]
+        })
 
-        # One-hot encoded manual mappings
-        if gender == "Male":
-            input_data["Gender_M"] = 1
-        else:
-            input_data["Gender_M"] = 0
+        # Apply encoders
+        df[["ST_Slope"]] = ordinal_encoder.transform(df[["ST_Slope"]])
+        cat_features = ["Gender", "ChestPainType", "RestingECG", "ExerciseAngina"]
+        onehot_df = pd.DataFrame(onehot_encoder.transform(df[cat_features]).toarray(),
+                                 columns=onehot_encoder.get_feature_names_out(cat_features))
 
-        for val in ["ATA", "NAP", "TA"]:
-            input_data[f"ChestPainType_{val}"] = 1 if cp_type == val else 0
-
-        input_data["FastingBS_Yes"] = 1 if fasting_bs == "Yes" else 0
-
-        for val in ["Normal", "ST"]:
-            input_data[f"RestingECG_{val}"] = 1 if rest_ecg == val else 0
-
-        input_data["ExerciseAngina_Y"] = 1 if exercise_angina == "Yes" else 0
-
-        # Convert to DataFrame
-        input_df = pd.DataFrame([input_data])
+        # Combine numeric + encoded
+        df_final = pd.concat([
+            df[["Age", "RestingBP", "Cholesterol", "MaxHR", "Oldpeak", "FastingBS", "ST_Slope"]],
+            onehot_df
+        ], axis=1)
 
         # Ensure all expected columns exist
-        for col in expected_cols:
-            if col not in input_df.columns:
-                input_df[col] = 0
+        for col in feature_columns:
+            if col not in df_final.columns:
+                df_final[col] = 0
 
-        # Reorder columns
-        input_df = input_df[expected_cols]
+        df_final = df_final[feature_columns]  # reorder
+
+        # Scale
+        df_scaled = scaler.transform(df_final)
 
         # Predict
-        prediction = model.predict(input_df)[0]
+        prediction = model.predict(df_scaled)[0]
         result = "Positive for Heart Disease 💔" if prediction == 1 else "No Heart Disease Detected ❤️"
         st.success(f"✅ Prediction: {result}")
 
