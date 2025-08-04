@@ -3,7 +3,7 @@ import pandas as pd
 import pickle
 
 # Load the model and transformers
-with open("model.pkl", "rb") as f:
+with open("heart_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 with open("scaler.pkl", "rb") as f:
