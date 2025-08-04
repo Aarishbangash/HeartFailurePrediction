@@ -112,18 +112,10 @@ def preprocess_input(df_in):
     # Before Box-Cox transformation, handle shift if any value <= 0, shift +1-min_val (done during training)
     # Here we apply same logic for input (manually implemented with same shifts)
     for col in numerical:
-        # Use training data min from notebook or assume approx min=training min per column from notebook
-        # For better, we can hardcode shifts applied during training or zero if none
-        # To keep consistent, perform min adjustment if input <=0
         if col in df.columns:
             if df[col].min() <= 0:
                 shift_amount = 1 - df[col].min()
                 df[col] = df[col] + shift_amount
-
-    # Apply Box-Cox transform: Box-Cox requires positive data, lambda values used during training unknown here
-    # For simplicity load lambdas or approximate transform won't be exactly the same, but acceptable for demo
-    # We'll hardcode lambdas from training (approximate) or do a safe transform here - for best results retrain lambdas externally
-    # Due to complexity in streamlit app, we will skip boxcox here and normalize with scaler directly, user aware that input should be reasonable
 
     # Apply ordinal encoding to ST_Slope (fit on ['Down', 'Flat', 'Up'])
     st_slope_vals = np.array(df[['ST_Slope']])
@@ -170,10 +162,7 @@ st.progress(int(prediction_proba*100))
 st.write(f"Likelihood of Heart Disease: {prediction_proba*100:.2f}%")
 
 # Show model performance metrics for best Random Forest (pre-computed on test)
-# We simulate loading or hard-code from notebook output metrics for display
-# For demo, store example metrics below or load from file if available
-# Here, using hardcoded example values from the notebook output provided:
-
+# Example placeholder metrics; replace with your actual test results from your notebook/model
 accuracy = 0.875
 precision = 0.88
 recall = 0.88
@@ -201,9 +190,6 @@ col4.metric("F1 Score", f"{f1:.2f}")
 st.text_area("Classification Report", classification_rep, height=140)
 
 # Feature importance display
-# Load feature importance data from notebook pre-saved or infer here for demo,
-# We'll simulate with example data since we don't have real saved importance here.
-
 importances = model.feature_importances_
 feature_importance_df = pd.DataFrame({
     'Feature': feature_cols,
