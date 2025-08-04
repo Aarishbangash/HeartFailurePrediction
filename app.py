@@ -4,7 +4,6 @@ import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 
 # Set wide layout and page config
 st.set_page_config(page_title="Heart Disease Prediction", layout="wide")
@@ -102,73 +101,53 @@ input_data = user_input_features()
 input_df = pd.DataFrame([input_data])
 
 # Preprocessing for prediction: follow steps from notebook
-
 def preprocess_input(df_in):
     df = df_in.copy()
-
-    # Numerical columns to transform with Box-Cox - from notebook pipeline
     numerical = ['Age', 'RestingBP', 'Cholesterol', 'MaxHR', 'Oldpeak']
 
-    # Before Box-Cox transformation, handle shift if any value <= 0, shift +1-min_val (done during training)
-    # Here we apply same logic for input (manually implemented with same shifts)
     for col in numerical:
         if col in df.columns:
             if df[col].min() <= 0:
                 shift_amount = 1 - df[col].min()
                 df[col] = df[col] + shift_amount
 
-    # Apply ordinal encoding to ST_Slope (fit on ['Down', 'Flat', 'Up'])
     st_slope_vals = np.array(df[['ST_Slope']])
     st_slope_enc = ord_encoder.transform(st_slope_vals)
     df['ST_Slope'] = st_slope_enc.flatten()
 
-    # Scale numerical columns (Use scaler fitted in training)
     num_values = df[numerical].values.astype(float)
     num_scaled = scaler.transform(num_values)
     df[numerical] = num_scaled
 
-    # One-hot encode categorical columns (Gender, ChestPainType, FastingBS, RestingECG, ExerciseAngina)
     cat_cols = ['Gender', 'ChestPainType', 'FastingBS', 'RestingECG', 'ExerciseAngina']
     cat_values = df[cat_cols]
     cat_encoded = onehot_encoder.transform(cat_values)
 
-    # Create DataFrame with encoded cat columns
     cat_encoded_df = pd.DataFrame(cat_encoded, columns=onehot_encoder.get_feature_names_out(cat_cols))
 
-    # Combine all processed columns
     processed_df = pd.concat([df[numerical], cat_encoded_df, df[['ST_Slope']]], axis=1)
 
-    # Reorder columns to match training features
     processed_df = processed_df.reindex(columns=feature_cols, fill_value=0)
 
     return processed_df
 
-
 X_input = preprocess_input(input_df)
 
 # Predict heart disease
-prediction_proba = model.predict_proba(X_input)[0, 1]
 prediction = model.predict(X_input)[0]
 
 # Map prediction to text
 result = "Disease Detected ❤️‍🩹" if prediction == 1 else "No Disease Detected 💓"
 
-# Show prediction result dynamically with meter
+# Show prediction result dynamically
 st.markdown("<h2 class='section-header'>Prediction Result</h2>", unsafe_allow_html=True)
 st.markdown(f"<h3 style='text-align:center;'>**{result}**</h3>", unsafe_allow_html=True)
 
-st.markdown("### Prediction Probability")
-st.progress(int(prediction_proba*100))
-st.write(f"Likelihood of Heart Disease: {prediction_proba*100:.2f}%")
+# Show model performance metrics (make sure to align these with classification report)
+# Replace these with actual metrics computed on test data for consistency
 
-# Show model performance metrics for best Random Forest (pre-computed on test)
-# Example placeholder metrics; replace with your actual test results from your notebook/model
-accuracy = 0.875
-precision = 0.88
-recall = 0.88
-f1 = 0.88
-
-classification_rep = """
+# Here, use classification report to extract exact metrics:
+classification_rep_text = """
               precision    recall  f1-score   support
 
            0       0.86      0.88      0.87        41
@@ -179,15 +158,42 @@ classification_rep = """
 weighted avg       0.87      0.87      0.87        83
 """
 
-st.markdown("<h2 class='section-header'>Model Performance Metrics (Random Forest)</h2>", unsafe_allow_html=True)
+# Parse metrics from the classification report string for exact display
+def parse_metrics_from_report(report_str):
+    lines = report_str.strip().split('\n')
+    acc = 0
+    precision = 0
+    recall = 0
+    f1 = 0
+    weighted_line = None
+    for line in lines:
+        if 'accuracy' in line.lower():
+            parts = line.strip().split()
+            try:
+                acc = float(parts[-2])
+            except:
+                acc = 0
+        if 'weighted avg' in line.lower():
+            weighted_line = line.strip().split()
+    if weighted_line and len(weighted_line) >= 4:
+        try:
+            precision = float(weighted_line[1])
+            recall = float(weighted_line[2])
+            f1 = float(weighted_line[3])
+        except:
+            precision = recall = f1 = 0
+    return acc, precision, recall, f1
 
+accuracy, precision, recall, f1 = parse_metrics_from_report(classification_rep_text)
+
+st.markdown("<h2 class='section-header'>Model Performance Metrics (Random Forest)</h2>", unsafe_allow_html=True)
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Accuracy", f"{accuracy:.2f}")
 col2.metric("Precision", f"{precision:.2f}")
 col3.metric("Recall", f"{recall:.2f}")
 col4.metric("F1 Score", f"{f1:.2f}")
 
-st.text_area("Classification Report", classification_rep, height=140)
+st.text_area("Classification Report", classification_rep_text, height=140)
 
 # Feature importance display
 importances = model.feature_importances_
