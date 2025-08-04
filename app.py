@@ -1,78 +1,87 @@
 import streamlit as st
-import pandas as pd
 import pickle
+import pandas as pd
+import numpy as np
 
-# Load model and encoders
+# Load model
 try:
-    with open("heart_model.pkl", "rb") as f:
+    with open("model.pkl", "rb") as f:
         model = pickle.load(f)
-
-    with open("scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
-
-    with open("ordinal_encoder.pkl", "rb") as f:
-        encoder = pickle.load(f)
-
-    with open("feature_columns.pkl", "rb") as f:
-        feature_columns = pickle.load(f)
 except Exception as e:
-    st.error(f"❌ Failed to load model or preprocessors: {e}")
+    st.error(f"❌ Failed to load model: {e}")
     st.stop()
 
-st.title("❤️ Heart Disease Risk Predictor")
-st.write("Fill in the patient details below to predict the likelihood of heart disease.")
+# Expected features
+expected_cols = [
+    'Age', 'RestingBP', 'Cholesterol', 'MaxHR', 'Oldpeak',
+    'Gender_M', 'ChestPainType_ATA', 'ChestPainType_NAP', 'ChestPainType_TA',
+    'FastingBS_Yes', 'RestingECG_Normal', 'RestingECG_ST',
+    'ExerciseAngina_Y', 'ST_Slope'
+]
 
-# Input fields
-Age = st.number_input("Age", min_value=1, max_value=120, value=40)
-RestingBP = st.number_input("Resting Blood Pressure", min_value=50, max_value=200, value=120)
-Cholesterol = st.number_input("Cholesterol", min_value=0, max_value=600, value=200)
-FastingBS = st.selectbox("Fasting Blood Sugar > 120 mg/dl", [0, 1])
-MaxHR = st.number_input("Max Heart Rate", min_value=60, max_value=220, value=150)
-Oldpeak = st.number_input("Oldpeak (ST depression)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+st.title("❤️ Heart Disease Prediction App")
 
-# Categorical inputs - MATCHED with training column names
-Gender = st.selectbox("Gender", ["Male", "Female"])
-ChestPainType = st.selectbox("Chest Pain Type", ["ATA", "NAP", "ASY", "TA"])
-ExerciseAngina = st.selectbox("Exercise-induced Angina", ["Y", "N"])
-Slope = st.selectbox("Slope of ST segment", ["Up", "Flat", "Down"])
+# Input form
+with st.form("user_inputs"):
+    age = st.number_input("Age", 20, 100, 50)
+    resting_bp = st.number_input("Resting Blood Pressure", 50, 200, 120)
+    cholesterol = st.number_input("Cholesterol", 0, 600, 200)
+    max_hr = st.number_input("Max Heart Rate", 60, 220, 150)
+    oldpeak = st.number_input("Oldpeak", 0.0, 10.0, 1.0)
 
-if st.button("Predict"):
+    gender = st.selectbox("Gender", ["Male", "Female"])
+    cp_type = st.selectbox("Chest Pain Type", ["TA", "ATA", "NAP", "ASY"])
+    fasting_bs = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["Yes", "No"])
+    rest_ecg = st.selectbox("Resting ECG", ["Normal", "LVH", "ST"])
+    exercise_angina = st.selectbox("Exercise Induced Angina", ["Yes", "No"])
+    st_slope = st.selectbox("ST Slope", ["Up", "Flat", "Down"])
+
+    submitted = st.form_submit_button("Predict")
+
+if submitted:
     try:
-        # Separate input into numerical and categorical
-        num_data = pd.DataFrame([[Age, RestingBP, Cholesterol, FastingBS, MaxHR, Oldpeak]],
-                                columns=["Age", "RestingBP", "Cholesterol", "FastingBS", "MaxHR", "Oldpeak"])
-        
-        cat_data = pd.DataFrame([[Gender, ChestPainType, ExerciseAngina]],
-                                columns=["Gender", "ChestPainType", "ExerciseAngina"])
+        # Base numeric features
+        input_data = {
+            "Age": age,
+            "RestingBP": resting_bp,
+            "Cholesterol": cholesterol,
+            "MaxHR": max_hr,
+            "Oldpeak": oldpeak,
+            "ST_Slope": st_slope
+        }
 
-        slope_data = pd.DataFrame([[Slope]], columns=["Slope"])  # separate to match encoder
+        # One-hot encoded manual mappings
+        if gender == "Male":
+            input_data["Gender_M"] = 1
+        else:
+            input_data["Gender_M"] = 0
 
-        # Scale numeric
-        scaled_num = pd.DataFrame(scaler.transform(num_data), columns=num_data.columns)
+        for val in ["ATA", "NAP", "TA"]:
+            input_data[f"ChestPainType_{val}"] = 1 if cp_type == val else 0
 
-        # Encode categorical
-        encoded_cat = pd.DataFrame(encoder.transform(cat_data).toarray(), columns=encoder.get_feature_names_out(cat_data.columns))
-        encoded_slope = pd.DataFrame(encoder.transform(slope_data).toarray(), columns=encoder.get_feature_names_out(slope_data.columns))
+        input_data["FastingBS_Yes"] = 1 if fasting_bs == "Yes" else 0
 
-        # Combine all
-        final_input = pd.concat([scaled_num, encoded_cat, encoded_slope], axis=1)
+        for val in ["Normal", "ST"]:
+            input_data[f"RestingECG_{val}"] = 1 if rest_ecg == val else 0
 
-        # Align with trained feature columns
-        for col in feature_columns:
-            if col not in final_input.columns:
-                final_input[col] = 0
-        final_input = final_input[feature_columns]
+        input_data["ExerciseAngina_Y"] = 1 if exercise_angina == "Yes" else 0
+
+        # Convert to DataFrame
+        input_df = pd.DataFrame([input_data])
+
+        # Ensure all expected columns exist
+        for col in expected_cols:
+            if col not in input_df.columns:
+                input_df[col] = 0
+
+        # Reorder columns
+        input_df = input_df[expected_cols]
 
         # Predict
-        prediction = model.predict(final_input)[0]
-        prob = model.predict_proba(final_input)[0][1]
-
-        st.subheader("Prediction Result")
-        if prediction == 1:
-            st.error(f"⚠️ High risk of heart disease. (Probability: {prob:.2f})")
-        else:
-            st.success(f"✅ Low risk of heart disease. (Probability: {prob:.2f})")
+        prediction = model.predict(input_df)[0]
+        result = "Positive for Heart Disease 💔" if prediction == 1 else "No Heart Disease Detected ❤️"
+        st.success(f"✅ Prediction: {result}")
 
     except Exception as e:
-        st.error("An error occurred during prediction. Check input and model files.")
-        st.text(f"Error: {e}")
+        st.error("❌ An error occurred during prediction.")
+        st.error(f"Error: {str(e)}")
